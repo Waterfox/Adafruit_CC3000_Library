@@ -1063,7 +1063,63 @@ bool Adafruit_CC3000::connectToAP(const char *ssid, const char *key, uint8_t sec
 
   return true;
 }
+bool Adafruit_CC3000::connectToAP2(const char *ssid, const char *key, uint8_t secmode) {
+  if (!_initialised) {
+    return false;
+  }
 
+  int16_t timer;
+
+  
+  cc3k_int_poll();
+  /* MEME: not sure why this is absolutely required but the cc3k freaks
+     if you dont. maybe bootup delay? */
+  // Setup a 4 second SSID scan
+  scanSSIDs(4000);
+  // Wait for results
+  delay(4500);
+  scanSSIDs(0);
+  
+  /* Attempt to connect to an access point */
+  if (CC3KPrinter != 0) {
+    //CC3KPrinter->print(F("\n\rConnecting to "));  //Connecting to 
+    CC3KPrinter->print(ssid);
+    //CC3KPrinter->print(F("..."));
+  }
+  if ((secmode == 0) || (strlen(key) == 0)) {
+    /* Connect to an unsecured network */
+    if (! connectOpen(ssid)) {
+      if (CC3KPrinter != 0) CC3KPrinter->println(F("F")); //Failed!
+      return false;
+    }
+  } else {
+    /* NOTE: Secure connections are not available in 'Tiny' mode! */
+#ifndef CC3000_TINY_DRIVER
+    /* Connect to a secure network using WPA2, etc */
+    if (! connectSecure(ssid, key, secmode)) {
+      if (CC3KPrinter != 0) CC3KPrinter->println(F("F")); //Failed!
+      return false;
+    }
+#endif
+  }
+  
+  timer = WLAN_CONNECT_TIMEOUT;
+
+  /* Wait around a bit for the async connected signal to arrive or timeout */
+  if (CC3KPrinter != 0) CC3KPrinter->print(F("Wait")); //Waiting to connect...
+  while ((timer > 0) && !checkConnected())
+  {
+    cc3k_int_poll();
+    delay(10);
+    timer -= 10;
+  }
+  if (timer <= 0) {
+    if (CC3KPrinter != 0) CC3KPrinter->println(F("TO!")); //Timed out!
+  }
+  if(!checkConnected()) return false;
+
+  return true;
+}
 
 #ifndef CC3000_TINY_DRIVER
 uint16_t Adafruit_CC3000::ping(uint32_t ip, uint8_t attempts, uint16_t timeout, uint8_t size) {
